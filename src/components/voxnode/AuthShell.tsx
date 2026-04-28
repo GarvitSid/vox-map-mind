@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
-import { Waves } from "lucide-react";
 import type { InputHTMLAttributes, ReactNode } from "react";
+import logoMark from "@/assets/voxnode-mark.png";
 
 export function AuthShell({ title, subtitle, children, footer }: { title: string; subtitle: string; children: ReactNode; footer: ReactNode }) {
   return (
@@ -8,9 +8,7 @@ export function AuthShell({ title, subtitle, children, footer }: { title: string
       <div className="pointer-events-none absolute inset-0" style={{ background: "var(--gradient-hero)" }} />
       <div className="relative mx-auto flex min-h-screen max-w-md flex-col px-6 py-10">
         <Link to="/" className="mb-12 inline-flex items-center gap-2">
-          <div className="grid h-8 w-8 place-items-center rounded-lg bg-gradient-amber shadow-glow">
-            <Waves className="h-4 w-4 text-primary-foreground" />
-          </div>
+          <img src={logoMark} alt="VoxNode" width={32} height={32} className="h-8 w-8 object-contain" />
           <span className="text-base font-semibold tracking-tight">VoxNode</span>
         </Link>
 
