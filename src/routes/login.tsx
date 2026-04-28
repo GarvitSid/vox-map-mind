@@ -2,6 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { AuthShell, Field, GoogleButton } from "@/components/voxnode/AuthShell";
 import { useState, type FormEvent } from "react";
 import { signInWithEmail } from "@/services/auth";
+import { useAuth } from "@/components/voxnode/AuthProvider";
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
@@ -10,6 +11,7 @@ export const Route = createFileRoute("/login")({
 
 function LoginPage() {
   const navigate = useNavigate();
+  const { refreshSession } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -19,7 +21,9 @@ function LoginPage() {
     setError(null);
     setLoading(true);
     try {
-      await signInWithEmail(email, password);
+      const result = await signInWithEmail(email.trim(), password);
+      if (!result.session) throw new Error("Sign in did not return a session. Please check your email and password.");
+      await refreshSession();
       navigate({ to: "/dashboard" });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Sign in failed");
