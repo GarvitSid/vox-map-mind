@@ -29,11 +29,11 @@ export const Route = createRootRoute({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
-      { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { title: "VoxNode — Speak your mind. See your thoughts." },
+      { name: "description", content: "Turn voice memos into living mind maps. VoxNode auto-organizes spoken brainstorms into visual, draggable node graphs." },
+      { name: "author", content: "VoxNode" },
+      { property: "og:title", content: "VoxNode — Speak your mind. See your thoughts." },
+      { property: "og:description", content: "Turn voice memos into living mind maps. Built for thinkers who brainstorm out loud." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@Lovable" },
@@ -52,7 +52,7 @@ export const Route = createRootRoute({
 
 function RootShell({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" className="dark">
       <head>
         <HeadContent />
       </head>
