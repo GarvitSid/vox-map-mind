@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { Waves } from "lucide-react";
+import logoMark from "@/assets/voxnode-mark.png";
 
 export function Header() {
   return (
@@ -7,9 +7,7 @@ export function Header() {
       <div className="mx-auto max-w-7xl px-6 pt-5">
         <div className="glass flex items-center justify-between rounded-2xl px-5 py-3">
           <Link to="/" className="flex items-center gap-2">
-            <div className="grid h-8 w-8 place-items-center rounded-lg bg-gradient-amber shadow-glow">
-              <Waves className="h-4 w-4 text-primary-foreground" />
-            </div>
+            <img src={logoMark} alt="VoxNode" width={32} height={32} className="h-8 w-8 object-contain" />
             <span className="text-base font-semibold tracking-tight">VoxNode</span>
           </Link>
           <nav className="hidden items-center gap-7 text-sm text-muted-foreground md:flex">

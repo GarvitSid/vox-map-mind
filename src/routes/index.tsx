@@ -3,7 +3,6 @@ import { Mic, Sparkles, GitBranch, Download, ArrowRight, Check, Brain, Zap } fro
 import { Header } from "@/components/voxnode/Header";
 import { Footer } from "@/components/voxnode/Footer";
 import { NeuralBackground } from "@/components/voxnode/NeuralBackground";
-import { HeroVisual } from "@/components/voxnode/HeroVisual";
 
 export const Route = createFileRoute("/")({
   component: Landing,
@@ -21,24 +20,38 @@ function Landing() {
         <div className="absolute inset-0 -z-0">
           <NeuralBackground />
         </div>
-        <div className="relative mx-auto max-w-7xl px-6 pt-20 pb-28 md:pt-28">
-          <div className="mx-auto max-w-3xl text-center">
+        {/* Ambient amber glow */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute left-1/2 top-1/3 -z-0 h-[520px] w-[820px] -translate-x-1/2 -translate-y-1/2 rounded-full opacity-40 blur-[120px]"
+          style={{ background: "radial-gradient(closest-side, oklch(0.78 0.15 65 / 0.55), transparent)" }}
+        />
+        <div className="relative mx-auto grid min-h-[88vh] max-w-7xl grid-cols-12 items-center gap-6 px-6 pb-24 pt-16 md:pt-24">
+          {/* Left: waveform */}
+          <div className="col-span-12 hidden h-[260px] items-center justify-center md:col-span-3 md:flex lg:col-span-2">
+            <HeroWaveform />
+          </div>
+
+          {/* Center: headline + CTA */}
+          <div className="col-span-12 flex flex-col items-center text-center md:col-span-6 lg:col-span-8">
             <span className="glass mb-6 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs text-muted-foreground">
               <Sparkles className="h-3 w-3 text-primary" />
               Voice → Structured thought
             </span>
-            <h1 className="text-5xl font-semibold leading-[1.05] tracking-tight md:text-7xl">
-              Speak your mind.
+            <h1 className="text-balance text-4xl font-semibold leading-[1.04] tracking-tight sm:text-5xl md:text-6xl lg:text-7xl">
+              Visualizing thought:
               <br />
-              <span className="text-gradient-amber">See your thoughts.</span>
+              <span className="text-gradient-amber">the neural canvas</span>
+              <br />
+              for your ideas
             </h1>
-            <p className="mx-auto mt-6 max-w-xl text-lg text-muted-foreground">
-              VoxNode turns rambling voice memos into living mind maps. No more audio graveyards — just clear, visual hierarchies of your ideas.
+            <p className="mx-auto mt-6 max-w-xl text-base text-muted-foreground md:text-lg">
+              The modern SaaS platform transforming spoken inputs into actionable mental models.
             </p>
             <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <Link
                 to="/signup"
-                className="group inline-flex items-center gap-2 rounded-xl bg-gradient-amber px-6 py-3.5 text-sm font-medium text-primary-foreground shadow-glow transition-transform hover:scale-[1.02]"
+                className="group inline-flex items-center gap-2 rounded-xl border border-primary/30 bg-gradient-amber px-7 py-3.5 text-sm font-medium text-primary-foreground shadow-glow transition-transform hover:scale-[1.02]"
               >
                 Start Mapping for Free
                 <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
@@ -47,10 +60,21 @@ function Landing() {
                 See how it works
               </a>
             </div>
+
+            {/* Mobile-only compact visuals */}
+            <div className="mt-12 grid w-full grid-cols-2 gap-4 md:hidden">
+              <div className="glass flex h-32 items-center justify-center rounded-2xl p-3">
+                <HeroWaveform />
+              </div>
+              <div className="glass flex h-32 items-center justify-center rounded-2xl p-3">
+                <HeroNodes />
+              </div>
+            </div>
           </div>
 
-          <div className="mx-auto mt-16 max-w-5xl">
-            <HeroVisual />
+          {/* Right: node graph */}
+          <div className="col-span-12 hidden h-[320px] items-center justify-center md:col-span-3 md:flex lg:col-span-2">
+            <HeroNodes />
           </div>
         </div>
       </section>
@@ -172,5 +196,56 @@ function Landing() {
 
       <Footer />
     </div>
+  );
+}
+
+function HeroWaveform() {
+  const bars = Array.from({ length: 34 });
+  return (
+    <div className="flex h-full w-full items-center justify-center gap-[3px]">
+      {bars.map((_, i) => {
+        const center = Math.abs(i - bars.length / 2) / (bars.length / 2);
+        const base = 1 - center * 0.85;
+        return (
+          <span
+            key={i}
+            className="wave-bar w-[3px] rounded-full bg-gradient-amber"
+            style={{
+              height: `${20 + base * 180}px`,
+              animationDelay: `${i * 55}ms`,
+              opacity: 0.45 + base * 0.55,
+            }}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+function HeroNodes() {
+  return (
+    <svg viewBox="0 0 260 320" className="h-full w-full" aria-hidden>
+      <defs>
+        <radialGradient id="heroNode" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor="oklch(0.85 0.16 75)" />
+          <stop offset="100%" stopColor="oklch(0.5 0.12 50)" />
+        </radialGradient>
+      </defs>
+      <g stroke="oklch(0.78 0.13 70 / 0.45)" strokeWidth="1">
+        <line x1="130" y1="160" x2="40" y2="60" />
+        <line x1="130" y1="160" x2="220" y2="55" />
+        <line x1="130" y1="160" x2="35" y2="250" />
+        <line x1="130" y1="160" x2="225" y2="270" />
+        <line x1="130" y1="160" x2="130" y2="40" />
+        <line x1="40" y1="60" x2="35" y2="250" />
+        <line x1="220" y1="55" x2="225" y2="270" />
+      </g>
+      <circle cx="130" cy="160" r="20" fill="url(#heroNode)" className="animate-float" />
+      <circle cx="40" cy="60" r="11" fill="url(#heroNode)" opacity="0.95" />
+      <circle cx="220" cy="55" r="13" fill="url(#heroNode)" opacity="0.9" />
+      <circle cx="35" cy="250" r="9" fill="url(#heroNode)" opacity="0.85" />
+      <circle cx="225" cy="270" r="14" fill="url(#heroNode)" opacity="0.95" />
+      <circle cx="130" cy="40" r="8" fill="url(#heroNode)" opacity="0.8" />
+    </svg>
   );
 }
