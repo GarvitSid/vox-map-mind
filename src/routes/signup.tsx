@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { AuthShell, Field, GoogleButton } from "@/components/voxnode/AuthShell";
 import { useState, type FormEvent } from "react";
-import { signUpWithEmail } from "@/services/auth";
+import { signInWithGoogle, signUpWithEmail } from "@/services/auth";
 import { useAuth } from "@/components/voxnode/AuthProvider";
 
 export const Route = createFileRoute("/signup")({
@@ -17,6 +17,18 @@ function SignupPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const handleGoogle = async () => {
+    setError(null);
+    setLoading(true);
+    try {
+      await signInWithGoogle();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Google sign in failed");
+      setLoading(false);
+    }
+  };
+
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -39,7 +51,7 @@ function SignupPage() {
       footer={<>Already have an account? <Link to="/login" className="text-primary hover:underline">Sign in</Link></>}
     >
       <form onSubmit={onSubmit} className="space-y-4">
-        <GoogleButton />
+        <GoogleButton onClick={handleGoogle} disabled={loading} />
         <div className="relative my-4 flex items-center">
           <div className="flex-1 border-t border-border" />
           <span className="px-3 text-xs text-muted-foreground">or</span>
