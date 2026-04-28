@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { AuthShell, Field, GoogleButton } from "@/components/voxnode/AuthShell";
-import type { FormEvent } from "react";
+import { useState, type FormEvent } from "react";
+import { signInWithEmail } from "@/services/auth";
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
@@ -9,7 +10,23 @@ export const Route = createFileRoute("/login")({
 
 function LoginPage() {
   const navigate = useNavigate();
-  const onSubmit = (e: FormEvent) => { e.preventDefault(); navigate({ to: "/dashboard" }); };
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const onSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
+    try {
+      await signInWithEmail(email, password);
+      navigate({ to: "/dashboard" });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Sign in failed");
+    } finally {
+      setLoading(false);
+    }
+  };
   return (
     <AuthShell
       title="Welcome back"
@@ -23,10 +40,11 @@ function LoginPage() {
           <span className="px-3 text-xs text-muted-foreground">or</span>
           <div className="flex-1 border-t border-border" />
         </div>
-        <Field label="Email" type="email" placeholder="you@example.com" />
-        <Field label="Password" type="password" placeholder="••••••••" />
-        <button className="mt-2 w-full rounded-xl bg-gradient-amber px-4 py-2.5 text-sm font-medium text-primary-foreground shadow-glow hover:scale-[1.01] transition-transform">
-          Sign in
+        <Field label="Email" type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
+        <Field label="Password" type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required />
+        {error && <p className="text-xs text-destructive">{error}</p>}
+        <button disabled={loading} className="mt-2 w-full rounded-xl bg-gradient-amber px-4 py-2.5 text-sm font-medium text-primary-foreground shadow-glow hover:scale-[1.01] transition-transform disabled:opacity-60">
+          {loading ? "Signing in…" : "Sign in"}
         </button>
       </form>
     </AuthShell>
