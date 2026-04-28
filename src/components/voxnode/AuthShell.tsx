@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { Waves } from "lucide-react";
-import type { ReactNode } from "react";
+import type { InputHTMLAttributes, ReactNode } from "react";
 
 export function AuthShell({ title, subtitle, children, footer }: { title: string; subtitle: string; children: ReactNode; footer: ReactNode }) {
   return (
@@ -38,14 +38,16 @@ export function GoogleButton() {
   );
 }
 
-export function Field({ label, type = "text", placeholder }: { label: string; type?: string; placeholder?: string }) {
+type FieldProps = InputHTMLAttributes<HTMLInputElement> & { label: string };
+
+export function Field({ label, type = "text", className, ...rest }: FieldProps) {
   return (
     <label className="block">
       <span className="mb-1.5 block text-xs font-medium text-muted-foreground">{label}</span>
       <input
         type={type}
-        placeholder={placeholder}
-        className="w-full rounded-xl border border-border bg-input/40 px-3.5 py-2.5 text-sm placeholder:text-muted-foreground/60 focus:border-primary/60 focus:outline-none focus:ring-2 focus:ring-primary/30 transition"
+        className={`w-full rounded-xl border border-border bg-input/40 px-3.5 py-2.5 text-sm placeholder:text-muted-foreground/60 focus:border-primary/60 focus:outline-none focus:ring-2 focus:ring-primary/30 transition ${className ?? ""}`}
+        {...rest}
       />
     </label>
   );

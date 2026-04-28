@@ -1,8 +1,15 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
-import { Mic, Square, Plus, Search, Download, FileText, ImageIcon, Waves, Settings, LogOut, Sparkles } from "lucide-react";
-import { mockNotes, mockMindMap, type VoiceNote } from "@/data/mockData";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useEffect, useMemo, useState } from "react";
+import { Mic, Square, Plus, Search, Download, FileText, ImageIcon, Waves, Settings, LogOut, Sparkles, Trash2 } from "lucide-react";
 import { MindMapCanvas } from "@/components/voxnode/MindMapCanvas";
+import { useAuth } from "@/components/voxnode/AuthProvider";
+import {
+  listVoiceNotes, createVoiceNote, deleteVoiceNote,
+  getMindMapForNote, createStarterMindMap,
+  type VoiceNoteRow, type MindMapNodeRow, type MindMapEdgeRow,
+} from "@/services/voiceNotes";
+import { signOut } from "@/services/auth";
+import type { MindMap } from "@/data/mockData";
 
 export const Route = createFileRoute("/dashboard")({
   component: Dashboard,
@@ -16,22 +23,116 @@ function fmtDate(iso: string) {
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
+function fmtDuration(sec: number) {
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+function toMindMap(noteId: string, nodes: MindMapNodeRow[], edges: MindMapEdgeRow[]): MindMap {
+  return {
+    noteId,
+    nodes: nodes.map((n) => ({ id: n.id, label: n.label, kind: n.kind, x: n.x, y: n.y })),
+    edges: edges.map((e) => ({ id: e.id, source: e.source_node_id, target: e.target_node_id })),
+  };
+}
+
 function Dashboard() {
-  const [notes] = useState<VoiceNote[]>(mockNotes);
-  const [activeId, setActiveId] = useState<string>(mockNotes[0].id);
+  const { user, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
+
+  const [notes, setNotes] = useState<VoiceNoteRow[]>([]);
+  const [activeId, setActiveId] = useState<string | null>(null);
   const [stage, setStage] = useState<Stage>("ready");
   const [query, setQuery] = useState("");
+  const [loadingNotes, setLoadingNotes] = useState(true);
+  const [mindMap, setMindMap] = useState<MindMap | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const filtered = notes.filter((n) => n.title.toLowerCase().includes(query.toLowerCase()));
-  const active = notes.find((n) => n.id === activeId) ?? notes[0];
+  // Auth guard
+  useEffect(() => {
+    if (!authLoading && !user) navigate({ to: "/login" });
+  }, [authLoading, user, navigate]);
 
-  const startRecording = () => {
+  // Load notes
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    setLoadingNotes(true);
+    listVoiceNotes()
+      .then((rows) => {
+        if (cancelled) return;
+        setNotes(rows);
+        setActiveId((prev) => prev ?? rows[0]?.id ?? null);
+      })
+      .catch((e) => setError(e instanceof Error ? e.message : "Failed to load notes"))
+      .finally(() => !cancelled && setLoadingNotes(false));
+    return () => { cancelled = true; };
+  }, [user]);
+
+  // Load active mind map
+  useEffect(() => {
+    if (!activeId) { setMindMap(null); return; }
+    let cancelled = false;
+    getMindMapForNote(activeId)
+      .then((res) => {
+        if (cancelled) return;
+        setMindMap(res ? toMindMap(activeId, res.nodes, res.edges) : null);
+      })
+      .catch((e) => setError(e instanceof Error ? e.message : "Failed to load mind map"));
+    return () => { cancelled = true; };
+  }, [activeId]);
+
+  const filtered = useMemo(
+    () => notes.filter((n) => n.title.toLowerCase().includes(query.toLowerCase())),
+    [notes, query],
+  );
+  const active = notes.find((n) => n.id === activeId) ?? null;
+
+  const startRecording = async () => {
+    if (!user) return;
     setStage("recording");
-    setTimeout(() => {
+    // Simulated capture window — replace with real MediaRecorder + transcription pipeline.
+    setTimeout(async () => {
       setStage("processing");
-      setTimeout(() => setStage("ready"), 1600);
-    }, 2400);
+      try {
+        const title = `Voice note ${new Date().toLocaleString()}`;
+        const note = await createVoiceNote({
+          user_id: user.id,
+          title,
+          preview: "New brainstorm captured.",
+          duration_seconds: 12,
+        });
+        await createStarterMindMap({ userId: user.id, noteId: note.id, title });
+        setNotes((prev) => [note, ...prev]);
+        setActiveId(note.id);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Failed to save note");
+      } finally {
+        setStage("ready");
+      }
+    }, 1800);
   };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Delete this voice note and its mind map?")) return;
+    try {
+      await deleteVoiceNote(id);
+      setNotes((prev) => prev.filter((n) => n.id !== id));
+      if (activeId === id) setActiveId(notes.find((n) => n.id !== id)?.id ?? null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to delete");
+    }
+  };
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate({ to: "/" });
+  };
+
+  if (authLoading || !user) {
+    return <div className="grid h-screen place-items-center bg-background text-sm text-muted-foreground">Loading…</div>;
+  }
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-background">
@@ -44,7 +145,7 @@ function Dashboard() {
           <span className="text-base font-semibold tracking-tight">VoxNode</span>
         </Link>
 
-        <button className="mb-4 flex items-center justify-center gap-2 rounded-xl bg-gradient-amber px-4 py-2.5 text-sm font-medium text-primary-foreground shadow-glow hover:scale-[1.01] transition-transform">
+        <button onClick={startRecording} disabled={stage !== "ready"} className="mb-4 flex items-center justify-center gap-2 rounded-xl bg-gradient-amber px-4 py-2.5 text-sm font-medium text-primary-foreground shadow-glow hover:scale-[1.01] transition-transform disabled:opacity-60">
           <Plus className="h-4 w-4" /> New voice note
         </button>
 
@@ -60,40 +161,50 @@ function Dashboard() {
 
         <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70 px-2 mb-2">Recent</div>
         <div className="flex-1 space-y-1 overflow-y-auto">
+          {loadingNotes && <div className="px-3 py-2 text-xs text-muted-foreground">Loading…</div>}
+          {!loadingNotes && filtered.length === 0 && (
+            <div className="px-3 py-2 text-xs text-muted-foreground">No notes yet — tap the mic to start.</div>
+          )}
           {filtered.map((n) => {
             const isActive = n.id === activeId;
             return (
-              <button
+              <div
                 key={n.id}
-                onClick={() => setActiveId(n.id)}
-                className={`group w-full rounded-lg px-3 py-2.5 text-left transition-colors ${
+                className={`group flex items-start gap-2 rounded-lg px-3 py-2.5 transition-colors ${
                   isActive ? "bg-secondary/70" : "hover:bg-secondary/40"
                 }`}
               >
-                <div className="flex items-center justify-between gap-2">
-                  <span className="truncate text-sm font-medium">{n.title}</span>
-                  <span className="shrink-0 text-[10px] text-muted-foreground">{fmtDate(n.createdAt)}</span>
-                </div>
-                <div className="mt-0.5 flex items-center gap-2 text-[11px] text-muted-foreground">
-                  <Mic className="h-3 w-3" /> {n.duration}
-                  <span className="truncate">· {n.preview}</span>
-                </div>
-              </button>
+                <button onClick={() => setActiveId(n.id)} className="min-w-0 flex-1 text-left">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="truncate text-sm font-medium">{n.title}</span>
+                    <span className="shrink-0 text-[10px] text-muted-foreground">{fmtDate(n.created_at)}</span>
+                  </div>
+                  <div className="mt-0.5 flex items-center gap-2 text-[11px] text-muted-foreground">
+                    <Mic className="h-3 w-3" /> {fmtDuration(n.duration_seconds)}
+                    <span className="truncate">· {n.preview}</span>
+                  </div>
+                </button>
+                <button onClick={() => handleDelete(n.id)} className="opacity-0 transition-opacity group-hover:opacity-100" aria-label="Delete note">
+                  <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
+                </button>
+              </div>
             );
           })}
         </div>
 
         <div className="mt-3 flex items-center justify-between border-t border-border/60 pt-3">
           <div className="flex items-center gap-2">
-            <div className="grid h-8 w-8 place-items-center rounded-full bg-secondary text-xs font-medium">A</div>
+            <div className="grid h-8 w-8 place-items-center rounded-full bg-secondary text-xs font-medium">
+              {(user.email ?? "U").charAt(0).toUpperCase()}
+            </div>
             <div>
-              <div className="text-xs font-medium">Ada L.</div>
-              <div className="text-[10px] text-muted-foreground">Pro plan</div>
+              <div className="max-w-[140px] truncate text-xs font-medium">{user.email}</div>
+              <div className="text-[10px] text-muted-foreground">Signed in</div>
             </div>
           </div>
           <div className="flex gap-1">
             <button className="rounded-md p-1.5 hover:bg-secondary/60"><Settings className="h-4 w-4 text-muted-foreground" /></button>
-            <Link to="/" className="rounded-md p-1.5 hover:bg-secondary/60"><LogOut className="h-4 w-4 text-muted-foreground" /></Link>
+            <button onClick={handleSignOut} className="rounded-md p-1.5 hover:bg-secondary/60" aria-label="Sign out"><LogOut className="h-4 w-4 text-muted-foreground" /></button>
           </div>
         </div>
       </aside>
@@ -104,7 +215,7 @@ function Dashboard() {
         <div className="flex items-center justify-between border-b border-border/60 px-6 py-4">
           <div>
             <div className="text-xs text-muted-foreground">Voice note</div>
-            <h1 className="text-lg font-semibold tracking-tight">{active.title}</h1>
+            <h1 className="text-lg font-semibold tracking-tight">{active?.title ?? "No note selected"}</h1>
           </div>
           <div className="flex items-center gap-2">
             <button className="glass inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium hover:bg-white/[0.04]">
@@ -118,6 +229,12 @@ function Dashboard() {
             </button>
           </div>
         </div>
+
+        {error && (
+          <div className="border-b border-destructive/30 bg-destructive/10 px-6 py-2 text-xs text-destructive">
+            {error} <button className="ml-2 underline" onClick={() => setError(null)}>dismiss</button>
+          </div>
+        )}
 
         {/* Record stage */}
         <div className="border-b border-border/60 px-6 py-5">
@@ -178,8 +295,15 @@ function Dashboard() {
                 <div className="mt-1 text-xs text-muted-foreground">This usually takes a few seconds.</div>
               </div>
             </div>
+          ) : mindMap ? (
+            <MindMapCanvas map={mindMap} />
           ) : (
-            <MindMapCanvas map={mockMindMap} />
+            <div className="grid h-full place-items-center text-center">
+              <div>
+                <div className="text-sm font-medium">No mind map yet</div>
+                <div className="mt-1 text-xs text-muted-foreground">Record a note to see your thoughts as a graph.</div>
+              </div>
+            </div>
           )}
         </div>
       </main>
