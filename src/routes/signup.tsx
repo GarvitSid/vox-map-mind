@@ -1,7 +1,8 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { AuthShell, Field, GoogleButton } from "@/components/voxnode/AuthShell";
 import { useState, type FormEvent } from "react";
-import { signUpWithEmail, signInWithEmail } from "@/services/auth";
+import { signInWithGoogle, signUpWithEmail } from "@/services/auth";
+import { useAuth } from "@/components/voxnode/AuthProvider";
 
 export const Route = createFileRoute("/signup")({
   component: SignupPage,
@@ -10,19 +11,32 @@ export const Route = createFileRoute("/signup")({
 
 function SignupPage() {
   const navigate = useNavigate();
+  const { refreshSession } = useAuth();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const handleGoogle = async () => {
+    setError(null);
+    setLoading(true);
+    try {
+      await signInWithGoogle();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Google sign in failed");
+      setLoading(false);
+    }
+  };
+
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
     setLoading(true);
     try {
-      await signUpWithEmail(email, password, name || undefined);
-      // Auto sign-in (works when email auto-confirm is enabled)
-      try { await signInWithEmail(email, password); } catch { /* may need email confirm */ }
+      const result = await signUpWithEmail(email.trim(), password, name.trim() || undefined);
+      if (!result.session) throw new Error("Account created. Please confirm your email, then sign in.");
+      await refreshSession();
       navigate({ to: "/dashboard" });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Sign up failed");
@@ -37,7 +51,7 @@ function SignupPage() {
       footer={<>Already have an account? <Link to="/login" className="text-primary hover:underline">Sign in</Link></>}
     >
       <form onSubmit={onSubmit} className="space-y-4">
-        <GoogleButton />
+        <GoogleButton onClick={handleGoogle} disabled={loading} />
         <div className="relative my-4 flex items-center">
           <div className="flex-1 border-t border-border" />
           <span className="px-3 text-xs text-muted-foreground">or</span>

@@ -1,7 +1,8 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { AuthShell, Field, GoogleButton } from "@/components/voxnode/AuthShell";
 import { useState, type FormEvent } from "react";
-import { signInWithEmail } from "@/services/auth";
+import { signInWithEmail, signInWithGoogle } from "@/services/auth";
+import { useAuth } from "@/components/voxnode/AuthProvider";
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
@@ -10,16 +11,31 @@ export const Route = createFileRoute("/login")({
 
 function LoginPage() {
   const navigate = useNavigate();
+  const { refreshSession } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const handleGoogle = async () => {
+    setError(null);
+    setLoading(true);
+    try {
+      await signInWithGoogle();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Google sign in failed");
+      setLoading(false);
+    }
+  };
+
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
     setLoading(true);
     try {
-      await signInWithEmail(email, password);
+      const result = await signInWithEmail(email.trim(), password);
+      if (!result.session) throw new Error("Sign in did not return a session. Please check your email and password.");
+      await refreshSession();
       navigate({ to: "/dashboard" });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Sign in failed");
@@ -34,7 +50,7 @@ function LoginPage() {
       footer={<>New here? <Link to="/signup" className="text-primary hover:underline">Create an account</Link></>}
     >
       <form onSubmit={onSubmit} className="space-y-4">
-        <GoogleButton />
+        <GoogleButton onClick={handleGoogle} disabled={loading} />
         <div className="relative my-4 flex items-center">
           <div className="flex-1 border-t border-border" />
           <span className="px-3 text-xs text-muted-foreground">or</span>

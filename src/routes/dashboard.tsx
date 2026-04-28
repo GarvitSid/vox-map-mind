@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Mic, Square, Plus, Search, Download, FileText, ImageIcon, Settings, LogOut, Sparkles, Trash2 } from "lucide-react";
+import { Mic, Square, Plus, Search, Download, FileText, ImageIcon, LogOut, Sparkles, Trash2 } from "lucide-react";
 import logoMark from "@/assets/voxnode-mark.png";
 import { MindMapCanvas } from "@/components/voxnode/MindMapCanvas";
 import { useAuth } from "@/components/voxnode/AuthProvider";
@@ -191,7 +191,7 @@ function Dashboard() {
           })}
         </div>
 
-        <div className="mt-3 flex items-center justify-between border-t border-border/60 pt-3">
+        <div className="mt-3 flex items-center justify-between gap-3 border-t border-border/60 pt-3">
           <div className="flex items-center gap-2">
             <div className="grid h-8 w-8 place-items-center rounded-full bg-secondary text-xs font-medium">
               {(user.email ?? "U").charAt(0).toUpperCase()}
@@ -201,22 +201,21 @@ function Dashboard() {
               <div className="text-[10px] text-muted-foreground">Signed in</div>
             </div>
           </div>
-          <div className="flex gap-1">
-            <button className="rounded-md p-1.5 hover:bg-secondary/60"><Settings className="h-4 w-4 text-muted-foreground" /></button>
-            <button onClick={handleSignOut} className="rounded-md p-1.5 hover:bg-secondary/60" aria-label="Sign out"><LogOut className="h-4 w-4 text-muted-foreground" /></button>
-          </div>
+          <button onClick={handleSignOut} className="inline-flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:bg-secondary/60 hover:text-foreground" aria-label="Sign out">
+            <LogOut className="h-3.5 w-3.5" /> Log out
+          </button>
         </div>
       </aside>
 
       {/* Main */}
       <main className="flex flex-1 flex-col overflow-hidden">
         {/* Top bar */}
-        <div className="flex items-center justify-between border-b border-border/60 px-6 py-4">
+        <div className="flex flex-col gap-3 border-b border-border/60 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <div>
             <div className="text-xs text-muted-foreground">Voice note</div>
             <h1 className="text-lg font-semibold tracking-tight">{active?.title ?? "No note selected"}</h1>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button className="glass inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium hover:bg-white/[0.04]">
               <ImageIcon className="h-3.5 w-3.5" /> Export PNG
             </button>
@@ -225,6 +224,9 @@ function Dashboard() {
             </button>
             <button className="inline-flex items-center gap-2 rounded-lg bg-gradient-amber px-3 py-2 text-xs font-medium text-primary-foreground shadow-glow">
               <Download className="h-3.5 w-3.5" /> Share
+            </button>
+            <button onClick={handleSignOut} className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-xs font-medium text-muted-foreground hover:bg-secondary/60 hover:text-foreground">
+              <LogOut className="h-3.5 w-3.5" /> Log out
             </button>
           </div>
         </div>
