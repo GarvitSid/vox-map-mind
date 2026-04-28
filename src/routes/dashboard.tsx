@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Mic, Square, Plus, Search, Download, FileText, ImageIcon, Waves, Settings, LogOut, Sparkles, Trash2 } from "lucide-react";
+import { Mic, Square, Plus, Search, Download, FileText, ImageIcon, Settings, LogOut, Sparkles, Trash2 } from "lucide-react";
+import logoMark from "@/assets/voxnode-mark.png";
 import { MindMapCanvas } from "@/components/voxnode/MindMapCanvas";
 import { useAuth } from "@/components/voxnode/AuthProvider";
 import {
@@ -139,9 +140,7 @@ function Dashboard() {
       {/* Sidebar */}
       <aside className="hidden w-72 shrink-0 flex-col border-r border-border/60 bg-card/40 p-4 md:flex">
         <Link to="/" className="mb-6 flex items-center gap-2 px-2">
-          <div className="grid h-8 w-8 place-items-center rounded-lg bg-gradient-amber shadow-glow">
-            <Waves className="h-4 w-4 text-primary-foreground" />
-          </div>
+          <img src={logoMark} alt="VoxNode" width={32} height={32} className="h-8 w-8 object-contain" />
           <span className="text-base font-semibold tracking-tight">VoxNode</span>
         </Link>
 
