@@ -1,7 +1,8 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { AuthShell, Field, GoogleButton } from "@/components/voxnode/AuthShell";
 import { useState, type FormEvent } from "react";
-import { signUpWithEmail, signInWithEmail } from "@/services/auth";
+import { signUpWithEmail } from "@/services/auth";
+import { useAuth } from "@/components/voxnode/AuthProvider";
 
 export const Route = createFileRoute("/signup")({
   component: SignupPage,
@@ -10,6 +11,7 @@ export const Route = createFileRoute("/signup")({
 
 function SignupPage() {
   const navigate = useNavigate();
+  const { refreshSession } = useAuth();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -20,9 +22,9 @@ function SignupPage() {
     setError(null);
     setLoading(true);
     try {
-      await signUpWithEmail(email, password, name || undefined);
-      // Auto sign-in (works when email auto-confirm is enabled)
-      try { await signInWithEmail(email, password); } catch { /* may need email confirm */ }
+      const result = await signUpWithEmail(email.trim(), password, name.trim() || undefined);
+      if (!result.session) throw new Error("Account created. Please confirm your email, then sign in.");
+      await refreshSession();
       navigate({ to: "/dashboard" });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Sign up failed");
