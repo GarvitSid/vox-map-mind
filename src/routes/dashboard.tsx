@@ -203,11 +203,12 @@ function Dashboard() {
       url: shareUrl,
     };
     try {
-      if (typeof navigator !== "undefined" && "share" in navigator) {
-        await navigator.share(shareData);
+      const nav: Navigator | undefined = typeof navigator !== "undefined" ? navigator : undefined;
+      if (nav && typeof nav.share === "function") {
+        await nav.share(shareData);
         return;
       }
-      await navigator.clipboard.writeText(shareUrl);
+      await nav?.clipboard.writeText(shareUrl);
       toast.success("Link copied to clipboard");
     } catch (e) {
       if (e instanceof Error && e.name === "AbortError") return;
