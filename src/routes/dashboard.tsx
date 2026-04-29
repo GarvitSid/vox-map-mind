@@ -369,7 +369,7 @@ function Dashboard() {
         </div>
 
         {/* Canvas */}
-        <div className="relative flex-1 overflow-hidden">
+        <div ref={canvasRef} className="relative flex-1 overflow-hidden">
           <div className="pointer-events-none absolute inset-0 opacity-60" style={{ background: "var(--gradient-hero)" }} />
           {stage === "processing" ? (
             <div className="grid h-full place-items-center">
