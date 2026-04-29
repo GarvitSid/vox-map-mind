@@ -1,6 +1,8 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Mic, Square, Plus, Search, Download, FileText, ImageIcon, LogOut, Sparkles, Trash2 } from "lucide-react";
+import { toPng } from "html-to-image";
+import { toast } from "sonner";
 import logoMark from "@/assets/voxnode-mark.png";
 import { MindMapCanvas } from "@/components/voxnode/MindMapCanvas";
 import { useAuth } from "@/components/voxnode/AuthProvider";
@@ -49,6 +51,7 @@ function Dashboard() {
   const [loadingNotes, setLoadingNotes] = useState(true);
   const [mindMap, setMindMap] = useState<MindMap | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const canvasRef = useRef<HTMLDivElement | null>(null);
 
   // Auth guard
   useEffect(() => {
@@ -129,6 +132,88 @@ function Dashboard() {
   const handleSignOut = async () => {
     await signOut();
     navigate({ to: "/" });
+  };
+
+  const handleExportPng = async () => {
+    if (!mindMap) {
+      toast.error("No mind map to export yet.");
+      return;
+    }
+    const target = canvasRef.current?.querySelector<HTMLElement>(".react-flow__viewport")
+      ?? canvasRef.current;
+    if (!target) {
+      toast.error("Canvas not ready.");
+      return;
+    }
+    try {
+      const dataUrl = await toPng(target, {
+        backgroundColor: "#0b0b0f",
+        pixelRatio: 2,
+        cacheBust: true,
+      });
+      const a = document.createElement("a");
+      a.href = dataUrl;
+      a.download = `${(active?.title ?? "mindmap").replace(/[^a-z0-9-_]+/gi, "_")}.png`;
+      a.click();
+      toast.success("PNG exported");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to export PNG");
+    }
+  };
+
+  const handleExportMarkdown = () => {
+    if (!mindMap || !active) {
+      toast.error("No mind map to export yet.");
+      return;
+    }
+    const root = mindMap.nodes.find((n) => n.kind === "root") ?? mindMap.nodes[0];
+    const childrenOf = (id: string) =>
+      mindMap.edges.filter((e) => e.source === id).map((e) => mindMap.nodes.find((n) => n.id === e.target)!).filter(Boolean);
+    const lines: string[] = [`# ${active.title}`, ""];
+    if (active.preview) lines.push(`> ${active.preview}`, "");
+    const walk = (id: string, depth: number) => {
+      for (const child of childrenOf(id)) {
+        lines.push(`${"  ".repeat(depth)}- ${child.kind === "task" ? "[ ] " : ""}${child.label}`);
+        walk(child.id, depth + 1);
+      }
+    };
+    if (root) {
+      lines.push(`## ${root.label}`, "");
+      walk(root.id, 0);
+    }
+    const blob = new Blob([lines.join("\n")], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${active.title.replace(/[^a-z0-9-_]+/gi, "_")}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("Markdown exported");
+  };
+
+  const handleShare = async () => {
+    if (!active) {
+      toast.error("Select a note to share.");
+      return;
+    }
+    const shareUrl = typeof window !== "undefined" ? window.location.href : "";
+    const shareData = {
+      title: `VoxNode — ${active.title}`,
+      text: active.preview ?? "Check out my VoxNode mind map.",
+      url: shareUrl,
+    };
+    try {
+      const nav: Navigator | undefined = typeof navigator !== "undefined" ? navigator : undefined;
+      if (nav && typeof nav.share === "function") {
+        await nav.share(shareData);
+        return;
+      }
+      await nav?.clipboard.writeText(shareUrl);
+      toast.success("Link copied to clipboard");
+    } catch (e) {
+      if (e instanceof Error && e.name === "AbortError") return;
+      toast.error("Unable to share");
+    }
   };
 
   if (authLoading || !user) {
@@ -216,13 +301,13 @@ function Dashboard() {
             <h1 className="text-lg font-semibold tracking-tight">{active?.title ?? "No note selected"}</h1>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <button className="glass inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium hover:bg-white/[0.04]">
+            <button onClick={handleExportPng} className="glass inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium hover:bg-white/[0.04]">
               <ImageIcon className="h-3.5 w-3.5" /> Export PNG
             </button>
-            <button className="glass inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium hover:bg-white/[0.04]">
+            <button onClick={handleExportMarkdown} className="glass inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium hover:bg-white/[0.04]">
               <FileText className="h-3.5 w-3.5" /> Export Markdown
             </button>
-            <button className="inline-flex items-center gap-2 rounded-lg bg-gradient-amber px-3 py-2 text-xs font-medium text-primary-foreground shadow-glow">
+            <button onClick={handleShare} className="inline-flex items-center gap-2 rounded-lg bg-gradient-amber px-3 py-2 text-xs font-medium text-primary-foreground shadow-glow hover:scale-[1.02] transition-transform">
               <Download className="h-3.5 w-3.5" /> Share
             </button>
             <button onClick={handleSignOut} className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-xs font-medium text-muted-foreground hover:bg-secondary/60 hover:text-foreground">
@@ -284,7 +369,7 @@ function Dashboard() {
         </div>
 
         {/* Canvas */}
-        <div className="relative flex-1 overflow-hidden">
+        <div ref={canvasRef} className="relative flex-1 overflow-hidden">
           <div className="pointer-events-none absolute inset-0 opacity-60" style={{ background: "var(--gradient-hero)" }} />
           {stage === "processing" ? (
             <div className="grid h-full place-items-center">
