@@ -54,10 +54,17 @@ export async function getMindMapForNote(noteId: string) {
 }
 
 /**
- * Creates a starter mind map with a root node for a given voice note.
- * In the real product this is where AI-derived structure gets persisted.
+ * Creates a mind map from structured content extracted from a transcript.
+ * Lays out idea nodes in an arc above the root and task nodes below it.
  */
-export async function createStarterMindMap(args: { userId: string; noteId: string; title: string }) {
+export async function createMindMapFromContent(args: {
+  userId: string;
+  noteId: string;
+  title: string;
+  root: string;
+  ideas: string[];
+  tasks: string[];
+}) {
   const { data: map, error: mErr } = await supabase
     .from("mind_maps")
     .insert({ user_id: args.userId, note_id: args.noteId, title: args.title })
@@ -67,19 +74,32 @@ export async function createStarterMindMap(args: { userId: string; noteId: strin
 
   const { data: root, error: rErr } = await supabase
     .from("mind_map_nodes")
-    .insert({ user_id: args.userId, mind_map_id: map.id, label: args.title, kind: "root", x: 0, y: 0 })
+    .insert({ user_id: args.userId, mind_map_id: map.id, label: args.root, kind: "root", x: 0, y: 0 })
     .select()
     .single();
   if (rErr) throw rErr;
 
-  const branches = [
-    { label: "Idea 1", kind: "idea" as const, x: -260, y: -120 },
-    { label: "Idea 2", kind: "idea" as const, x: 260, y: -120 },
-    { label: "Next step", kind: "task" as const, x: 0, y: 180 },
-  ];
+  // Position ideas in an arc above the root, tasks in a row below.
+  const ideaCount = args.ideas.length;
+  const ideaRows = args.ideas.map((label, i) => {
+    const spread = Math.max(ideaCount - 1, 1);
+    const x = ideaCount === 1 ? 0 : -320 + (640 / spread) * i;
+    const y = -160 - (i % 2) * 40;
+    return { user_id: args.userId, mind_map_id: map.id, label, kind: "idea" as const, x, y };
+  });
+  const taskRows = args.tasks.map((label, i) => {
+    const taskCount = args.tasks.length;
+    const spread = Math.max(taskCount - 1, 1);
+    const x = taskCount === 1 ? 0 : -260 + (520 / spread) * i;
+    return { user_id: args.userId, mind_map_id: map.id, label, kind: "task" as const, x, y: 200 };
+  });
+
+  const allRows = [...ideaRows, ...taskRows];
+  if (allRows.length === 0) return map;
+
   const { data: children, error: cErr } = await supabase
     .from("mind_map_nodes")
-    .insert(branches.map((b) => ({ user_id: args.userId, mind_map_id: map.id, ...b })))
+    .insert(allRows)
     .select();
   if (cErr) throw cErr;
 
@@ -95,4 +115,17 @@ export async function createStarterMindMap(args: { userId: string; noteId: strin
   }
 
   return map;
+}
+
+/** Calls the generate-mindmap edge function to turn a transcript into structured content. */
+export async function generateMindMapFromTranscript(transcript: string) {
+  const { data, error } = await supabase.functions.invoke<{
+    title: string;
+    root: string;
+    ideas: string[];
+    tasks: string[];
+  }>("generate-mindmap", { body: { transcript } });
+  if (error) throw error;
+  if (!data) throw new Error("Empty response from mind map generator");
+  return data;
 }
