@@ -260,8 +260,12 @@ function Dashboard() {
           <span className="text-base font-semibold tracking-tight">VoxNode</span>
         </Link>
 
-        <button onClick={startRecording} disabled={stage !== "ready"} className="mb-4 flex items-center justify-center gap-2 rounded-xl bg-gradient-amber px-4 py-2.5 text-sm font-medium text-primary-foreground shadow-glow hover:scale-[1.01] transition-transform disabled:opacity-60">
-          <Plus className="h-4 w-4" /> New voice note
+        <button
+          onClick={stage === "recording" ? stopRecording : startRecording}
+          disabled={stage === "processing"}
+          className="mb-4 flex items-center justify-center gap-2 rounded-xl bg-gradient-amber px-4 py-2.5 text-sm font-medium text-primary-foreground shadow-glow hover:scale-[1.01] transition-transform disabled:opacity-60"
+        >
+          {stage === "recording" ? <><Square className="h-4 w-4" /> Stop & save</> : <><Plus className="h-4 w-4" /> New voice note</>}
         </button>
 
         <div className="relative mb-3">
