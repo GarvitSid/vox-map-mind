@@ -8,10 +8,11 @@ import { MindMapCanvas } from "@/components/voxnode/MindMapCanvas";
 import { useAuth } from "@/components/voxnode/AuthProvider";
 import {
   listVoiceNotes, createVoiceNote, deleteVoiceNote,
-  getMindMapForNote, createStarterMindMap,
+  getMindMapForNote, createMindMapFromContent, generateMindMapFromTranscript,
   type VoiceNoteRow, type MindMapNodeRow, type MindMapEdgeRow,
 } from "@/services/voiceNotes";
 import { signOut } from "@/services/auth";
+import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
 import type { MindMap } from "@/data/mockData";
 
 export const Route = createFileRoute("/dashboard")({
@@ -52,6 +53,8 @@ function Dashboard() {
   const [mindMap, setMindMap] = useState<MindMap | null>(null);
   const [error, setError] = useState<string | null>(null);
   const canvasRef = useRef<HTMLDivElement | null>(null);
+  const recordStartRef = useRef<number>(0);
+  const speech = useSpeechRecognition();
 
   // Auth guard
   useEffect(() => {
@@ -93,29 +96,57 @@ function Dashboard() {
   );
   const active = notes.find((n) => n.id === activeId) ?? null;
 
-  const startRecording = async () => {
+  const startRecording = () => {
     if (!user) return;
-    setStage("recording");
-    // Simulated capture window — replace with real MediaRecorder + transcription pipeline.
-    setTimeout(async () => {
-      setStage("processing");
-      try {
-        const title = `Voice note ${new Date().toLocaleString()}`;
-        const note = await createVoiceNote({
-          user_id: user.id,
-          title,
-          preview: "New brainstorm captured.",
-          duration_seconds: 12,
-        });
-        await createStarterMindMap({ userId: user.id, noteId: note.id, title });
-        setNotes((prev) => [note, ...prev]);
-        setActiveId(note.id);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Failed to save note");
-      } finally {
-        setStage("ready");
-      }
-    }, 1800);
+    if (!speech.supported) {
+      toast.error("Speech recognition isn't supported here. Try Chrome or Edge on desktop.");
+      return;
+    }
+    setError(null);
+    recordStartRef.current = Date.now();
+    const ok = speech.start();
+    if (ok) setStage("recording");
+  };
+
+  const stopRecording = async () => {
+    if (!user) return;
+    const transcript = await speech.stop();
+    const duration = Math.max(1, Math.round((Date.now() - recordStartRef.current) / 1000));
+
+    if (!transcript || transcript.length < 2) {
+      setStage("ready");
+      toast.error("We didn't catch any speech — try again a bit closer to the mic.");
+      return;
+    }
+
+    setStage("processing");
+    try {
+      const structured = await generateMindMapFromTranscript(transcript);
+      const title = structured.title?.trim() || transcript.split(/\s+/).slice(0, 5).join(" ");
+      const preview = transcript.length > 160 ? transcript.slice(0, 157).trimEnd() + "…" : transcript;
+
+      const note = await createVoiceNote({
+        user_id: user.id,
+        title,
+        preview,
+        duration_seconds: duration,
+      });
+      await createMindMapFromContent({
+        userId: user.id,
+        noteId: note.id,
+        title,
+        root: structured.root || title,
+        ideas: structured.ideas ?? [],
+        tasks: structured.tasks ?? [],
+      });
+      setNotes((prev) => [note, ...prev]);
+      setActiveId(note.id);
+      toast.success("Mind map ready");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to save note");
+    } finally {
+      setStage("ready");
+    }
   };
 
   const handleDelete = async (id: string) => {
@@ -229,8 +260,12 @@ function Dashboard() {
           <span className="text-base font-semibold tracking-tight">VoxNode</span>
         </Link>
 
-        <button onClick={startRecording} disabled={stage !== "ready"} className="mb-4 flex items-center justify-center gap-2 rounded-xl bg-gradient-amber px-4 py-2.5 text-sm font-medium text-primary-foreground shadow-glow hover:scale-[1.01] transition-transform disabled:opacity-60">
-          <Plus className="h-4 w-4" /> New voice note
+        <button
+          onClick={stage === "recording" ? stopRecording : startRecording}
+          disabled={stage === "processing"}
+          className="mb-4 flex items-center justify-center gap-2 rounded-xl bg-gradient-amber px-4 py-2.5 text-sm font-medium text-primary-foreground shadow-glow hover:scale-[1.01] transition-transform disabled:opacity-60"
+        >
+          {stage === "recording" ? <><Square className="h-4 w-4" /> Stop & save</> : <><Plus className="h-4 w-4" /> New voice note</>}
         </button>
 
         <div className="relative mb-3">
@@ -327,7 +362,7 @@ function Dashboard() {
           <div className="glass flex items-center justify-between gap-6 rounded-2xl px-5 py-4">
             <div className="flex items-center gap-4">
               <button
-                onClick={stage === "recording" ? () => setStage("processing") : startRecording}
+                onClick={stage === "recording" ? stopRecording : startRecording}
                 disabled={stage === "processing"}
                 className={`relative grid h-14 w-14 place-items-center rounded-full transition-all ${
                   stage === "recording"
@@ -341,12 +376,14 @@ function Dashboard() {
               <div>
                 <div className="text-sm font-medium">
                   {stage === "idle" && "Tap to start a new note"}
-                  {stage === "recording" && "Listening…"}
+                  {stage === "recording" && (speech.interim ? `“${speech.interim}”` : "Listening…")}
                   {stage === "processing" && "Structuring your thoughts…"}
-                  {stage === "ready" && "Ready when you are"}
+                  {stage === "ready" && (speech.supported ? "Ready when you are" : "Speech not supported in this browser")}
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  {stage === "recording" ? "Speak naturally — we'll handle the structure." : "Or open an existing note from the sidebar."}
+                  {stage === "recording"
+                    ? "Speak naturally — tap the square to stop."
+                    : speech.error ?? "Or open an existing note from the sidebar."}
                 </div>
               </div>
             </div>
