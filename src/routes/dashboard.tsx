@@ -1,11 +1,12 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Mic, Square, Plus, Search, Download, FileText, ImageIcon, LogOut, Sparkles, Trash2 } from "lucide-react";
+import { Mic, Square, Plus, Search, Download, FileText, ImageIcon, LogOut, Sparkles, Trash2, Menu } from "lucide-react";
 import { toPng } from "html-to-image";
 import { toast } from "sonner";
 import logoMark from "@/assets/voxnode-mark.png";
 import { MindMapCanvas } from "@/components/voxnode/MindMapCanvas";
 import { useAuth } from "@/components/voxnode/AuthProvider";
+import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription, SheetHeader } from "@/components/ui/sheet";
 import {
   listVoiceNotes, createVoiceNote, deleteVoiceNote,
   getMindMapForNote, createMindMapFromContent, generateMindMapFromTranscript,
@@ -55,6 +56,7 @@ function Dashboard() {
   const canvasRef = useRef<HTMLDivElement | null>(null);
   const recordStartRef = useRef<number>(0);
   const speech = useSpeechRecognition();
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   // Auth guard
   useEffect(() => {
@@ -251,89 +253,115 @@ function Dashboard() {
     return <div className="grid h-screen place-items-center bg-background text-sm text-muted-foreground">Loading…</div>;
   }
 
+  const sidebarContent = (
+    <>
+      <Link to="/" className="mb-6 flex items-center gap-2 px-2">
+        <img src={logoMark} alt="VoxNode" width={32} height={32} className="h-8 w-8 object-contain" />
+        <span className="text-base font-semibold tracking-tight">VoxNode</span>
+      </Link>
+
+      <button
+        onClick={() => { stage === "recording" ? stopRecording() : startRecording(); setMobileNavOpen(false); }}
+        disabled={stage === "processing"}
+        className="mb-4 flex items-center justify-center gap-2 rounded-xl bg-gradient-amber px-4 py-2.5 text-sm font-medium text-primary-foreground shadow-glow hover:scale-[1.01] transition-transform disabled:opacity-60"
+      >
+        {stage === "recording" ? <><Square className="h-4 w-4" /> Stop & save</> : <><Plus className="h-4 w-4" /> New voice note</>}
+      </button>
+
+      <div className="relative mb-3">
+        <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search notes…"
+          className="w-full rounded-lg border border-border bg-input/30 py-2 pl-9 pr-3 text-sm placeholder:text-muted-foreground/60 focus:border-primary/50 focus:outline-none"
+        />
+      </div>
+
+      <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70 px-2 mb-2">Recent</div>
+      <div className="flex-1 space-y-1 overflow-y-auto">
+        {loadingNotes && <div className="px-3 py-2 text-xs text-muted-foreground">Loading…</div>}
+        {!loadingNotes && filtered.length === 0 && (
+          <div className="px-3 py-2 text-xs text-muted-foreground">No notes yet — tap the mic to start.</div>
+        )}
+        {filtered.map((n) => {
+          const isActive = n.id === activeId;
+          return (
+            <div
+              key={n.id}
+              className={`group flex items-start gap-2 rounded-lg px-3 py-2.5 transition-colors ${
+                isActive ? "bg-secondary/70" : "hover:bg-secondary/40"
+              }`}
+            >
+              <button onClick={() => { setActiveId(n.id); setMobileNavOpen(false); }} className="min-w-0 flex-1 text-left">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="truncate text-sm font-medium">{n.title}</span>
+                  <span className="shrink-0 text-[10px] text-muted-foreground">{fmtDate(n.created_at)}</span>
+                </div>
+                <div className="mt-0.5 flex items-center gap-2 text-[11px] text-muted-foreground">
+                  <Mic className="h-3 w-3" /> {fmtDuration(n.duration_seconds)}
+                  <span className="truncate">· {n.preview}</span>
+                </div>
+              </button>
+              <button onClick={() => handleDelete(n.id)} className="opacity-60 transition-opacity md:opacity-0 md:group-hover:opacity-100" aria-label="Delete note">
+                <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
+              </button>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="mt-3 flex items-center justify-between gap-3 border-t border-border/60 pt-3">
+        <div className="flex items-center gap-2">
+          <div className="grid h-8 w-8 place-items-center rounded-full bg-secondary text-xs font-medium">
+            {(user.email ?? "U").charAt(0).toUpperCase()}
+          </div>
+          <div>
+            <div className="max-w-[140px] truncate text-xs font-medium">{user.email}</div>
+            <div className="text-[10px] text-muted-foreground">Signed in</div>
+          </div>
+        </div>
+        <button onClick={handleSignOut} className="inline-flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:bg-secondary/60 hover:text-foreground" aria-label="Sign out">
+          <LogOut className="h-3.5 w-3.5" /> Log out
+        </button>
+      </div>
+    </>
+  );
+
   return (
     <div className="flex h-screen w-full overflow-hidden bg-background">
       {/* Sidebar */}
       <aside className="hidden w-72 shrink-0 flex-col border-r border-border/60 bg-card/40 p-4 md:flex">
-        <Link to="/" className="mb-6 flex items-center gap-2 px-2">
-          <img src={logoMark} alt="VoxNode" width={32} height={32} className="h-8 w-8 object-contain" />
-          <span className="text-base font-semibold tracking-tight">VoxNode</span>
-        </Link>
-
-        <button
-          onClick={stage === "recording" ? stopRecording : startRecording}
-          disabled={stage === "processing"}
-          className="mb-4 flex items-center justify-center gap-2 rounded-xl bg-gradient-amber px-4 py-2.5 text-sm font-medium text-primary-foreground shadow-glow hover:scale-[1.01] transition-transform disabled:opacity-60"
-        >
-          {stage === "recording" ? <><Square className="h-4 w-4" /> Stop & save</> : <><Plus className="h-4 w-4" /> New voice note</>}
-        </button>
-
-        <div className="relative mb-3">
-          <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search notes…"
-            className="w-full rounded-lg border border-border bg-input/30 py-2 pl-9 pr-3 text-sm placeholder:text-muted-foreground/60 focus:border-primary/50 focus:outline-none"
-          />
-        </div>
-
-        <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70 px-2 mb-2">Recent</div>
-        <div className="flex-1 space-y-1 overflow-y-auto">
-          {loadingNotes && <div className="px-3 py-2 text-xs text-muted-foreground">Loading…</div>}
-          {!loadingNotes && filtered.length === 0 && (
-            <div className="px-3 py-2 text-xs text-muted-foreground">No notes yet — tap the mic to start.</div>
-          )}
-          {filtered.map((n) => {
-            const isActive = n.id === activeId;
-            return (
-              <div
-                key={n.id}
-                className={`group flex items-start gap-2 rounded-lg px-3 py-2.5 transition-colors ${
-                  isActive ? "bg-secondary/70" : "hover:bg-secondary/40"
-                }`}
-              >
-                <button onClick={() => setActiveId(n.id)} className="min-w-0 flex-1 text-left">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="truncate text-sm font-medium">{n.title}</span>
-                    <span className="shrink-0 text-[10px] text-muted-foreground">{fmtDate(n.created_at)}</span>
-                  </div>
-                  <div className="mt-0.5 flex items-center gap-2 text-[11px] text-muted-foreground">
-                    <Mic className="h-3 w-3" /> {fmtDuration(n.duration_seconds)}
-                    <span className="truncate">· {n.preview}</span>
-                  </div>
-                </button>
-                <button onClick={() => handleDelete(n.id)} className="opacity-0 transition-opacity group-hover:opacity-100" aria-label="Delete note">
-                  <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
-                </button>
-              </div>
-            );
-          })}
-        </div>
-
-        <div className="mt-3 flex items-center justify-between gap-3 border-t border-border/60 pt-3">
-          <div className="flex items-center gap-2">
-            <div className="grid h-8 w-8 place-items-center rounded-full bg-secondary text-xs font-medium">
-              {(user.email ?? "U").charAt(0).toUpperCase()}
-            </div>
-            <div>
-              <div className="max-w-[140px] truncate text-xs font-medium">{user.email}</div>
-              <div className="text-[10px] text-muted-foreground">Signed in</div>
-            </div>
-          </div>
-          <button onClick={handleSignOut} className="inline-flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:bg-secondary/60 hover:text-foreground" aria-label="Sign out">
-            <LogOut className="h-3.5 w-3.5" /> Log out
-          </button>
-        </div>
+        {sidebarContent}
       </aside>
+
+      {/* Mobile sidebar drawer */}
+      <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
+        <SheetContent side="left" className="flex w-[300px] flex-col bg-card/95 p-4 sm:w-[320px]">
+          <SheetHeader className="sr-only">
+            <SheetTitle>Notes navigation</SheetTitle>
+            <SheetDescription>Browse and open your saved voice notes.</SheetDescription>
+          </SheetHeader>
+          {sidebarContent}
+        </SheetContent>
+      </Sheet>
 
       {/* Main */}
       <main className="flex flex-1 flex-col overflow-hidden">
         {/* Top bar */}
         <div className="flex flex-col gap-3 border-b border-border/60 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-          <div>
-            <div className="text-xs text-muted-foreground">Voice note</div>
-            <h1 className="text-lg font-semibold tracking-tight">{active?.title ?? "No note selected"}</h1>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setMobileNavOpen(true)}
+              className="md:hidden inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-card/60 text-foreground"
+              aria-label="Open notes"
+            >
+              <Menu className="h-4 w-4" />
+            </button>
+            <div>
+              <div className="text-xs text-muted-foreground">Voice note</div>
+              <h1 className="text-lg font-semibold tracking-tight">{active?.title ?? "No note selected"}</h1>
+            </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <button onClick={handleExportPng} className="glass inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium hover:bg-white/[0.04]">
