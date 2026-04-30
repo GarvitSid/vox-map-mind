@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Mic, Square, Plus, Search, Download, FileText, ImageIcon, LogOut, Sparkles, Trash2, Menu } from "lucide-react";
 import { toPng } from "html-to-image";
 import { toast } from "sonner";
@@ -10,8 +10,10 @@ import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription, SheetH
 import {
   listVoiceNotes, createVoiceNote, deleteVoiceNote,
   getMindMapForNote, createMindMapFromContent, generateMindMapFromTranscript,
+  setVoiceNoteAudio,
   type VoiceNoteRow, type MindMapNodeRow, type MindMapEdgeRow,
 } from "@/services/voiceNotes";
+import { uploadVoiceRecording } from "@/services/audioStorage";
 import { signOut } from "@/services/auth";
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
 import type { MindMap } from "@/data/mockData";
@@ -52,6 +54,7 @@ function Dashboard() {
   const [query, setQuery] = useState("");
   const [loadingNotes, setLoadingNotes] = useState(true);
   const [mindMap, setMindMap] = useState<MindMap | null>(null);
+  const [mindMapId, setMindMapId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const canvasRef = useRef<HTMLDivElement | null>(null);
   const recordStartRef = useRef<number>(0);
@@ -80,17 +83,17 @@ function Dashboard() {
   }, [user]);
 
   // Load active mind map
-  useEffect(() => {
-    if (!activeId) { setMindMap(null); return; }
-    let cancelled = false;
-    getMindMapForNote(activeId)
-      .then((res) => {
-        if (cancelled) return;
-        setMindMap(res ? toMindMap(activeId, res.nodes, res.edges) : null);
-      })
-      .catch((e) => setError(e instanceof Error ? e.message : "Failed to load mind map"));
-    return () => { cancelled = true; };
+  const reloadMindMap = useCallback(async () => {
+    if (!activeId) { setMindMap(null); setMindMapId(null); return; }
+    try {
+      const res = await getMindMapForNote(activeId);
+      setMindMap(res ? toMindMap(activeId, res.nodes, res.edges) : null);
+      setMindMapId(res?.map.id ?? null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load mind map");
+    }
   }, [activeId]);
+  useEffect(() => { void reloadMindMap(); }, [reloadMindMap]);
 
   const filtered = useMemo(
     () => notes.filter((n) => n.title.toLowerCase().includes(query.toLowerCase())),
@@ -98,7 +101,7 @@ function Dashboard() {
   );
   const active = notes.find((n) => n.id === activeId) ?? null;
 
-  const startRecording = () => {
+  const startRecording = async () => {
     if (!user) return;
     if (!speech.supported) {
       toast.error("Speech recognition isn't supported here. Try Chrome or Edge on desktop.");
@@ -106,13 +109,13 @@ function Dashboard() {
     }
     setError(null);
     recordStartRef.current = Date.now();
-    const ok = speech.start();
+    const ok = await speech.start();
     if (ok) setStage("recording");
   };
 
   const stopRecording = async () => {
     if (!user) return;
-    const transcript = await speech.stop();
+    const { transcript, audioBlob, mimeType } = await speech.stop();
     const duration = Math.max(1, Math.round((Date.now() - recordStartRef.current) / 1000));
 
     if (!transcript || transcript.length < 2) {
@@ -124,6 +127,9 @@ function Dashboard() {
     setStage("processing");
     try {
       const structured = await generateMindMapFromTranscript(transcript);
+      if (structured.degraded) {
+        toast.warning("AI was unavailable — showing a quick keyword summary instead.");
+      }
       const title = structured.title?.trim() || transcript.split(/\s+/).slice(0, 5).join(" ");
       const preview = transcript.length > 160 ? transcript.slice(0, 157).trimEnd() + "…" : transcript;
 
@@ -141,8 +147,22 @@ function Dashboard() {
         ideas: structured.ideas ?? [],
         tasks: structured.tasks ?? [],
       });
-      setNotes((prev) => [note, ...prev]);
-      setActiveId(note.id);
+      // Upload the original recording (best-effort) and store its path.
+      let savedNote = note;
+      if (audioBlob && audioBlob.size > 0) {
+        try {
+          const path = await uploadVoiceRecording({
+            userId: user.id, noteId: note.id, blob: audioBlob, mimeType,
+          });
+          await setVoiceNoteAudio(note.id, path);
+          savedNote = { ...note, audio_url: path };
+        } catch (e) {
+          console.warn("Audio upload failed:", e);
+          toast.warning("Saved your note, but couldn't upload the audio file.");
+        }
+      }
+      setNotes((prev) => [savedNote, ...prev]);
+      setActiveId(savedNote.id);
       toast.success("Mind map ready");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to save note");
@@ -447,7 +467,12 @@ function Dashboard() {
               </div>
             </div>
           ) : mindMap ? (
-            <MindMapCanvas map={mindMap} />
+            <MindMapCanvas
+              map={mindMap}
+              userId={user.id}
+              mindMapId={mindMapId}
+              onChange={reloadMindMap}
+            />
           ) : (
             <div className="grid h-full place-items-center text-center">
               <div>

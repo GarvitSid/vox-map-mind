@@ -56,7 +56,7 @@ Deno.serve(async (req: Request) => {
 
     const apiKey = Deno.env.get("LOVABLE_API_KEY");
     if (!apiKey) {
-      return new Response(JSON.stringify(fallback(transcript)), {
+      return new Response(JSON.stringify({ ...fallback(transcript), degraded: true, reason: "missing_api_key" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -87,7 +87,7 @@ Transcript:
 
     if (!aiRes.ok) {
       console.error("AI gateway error", aiRes.status, await aiRes.text());
-      return new Response(JSON.stringify(fallback(transcript)), {
+      return new Response(JSON.stringify({ ...fallback(transcript), degraded: true, reason: `ai_${aiRes.status}` }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
