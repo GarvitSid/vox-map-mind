@@ -35,10 +35,14 @@ export const Route = createRootRoute({
       { name: "description", content: "Turn voice memos into living mind maps. VoxNode auto-organizes spoken brainstorms into visual, draggable node graphs." },
       { name: "author", content: "VoxNode" },
       { property: "og:title", content: "VoxNode — Speak your mind. See your thoughts." },
-      { property: "og:description", content: "Turn voice memos into living mind maps. Built for thinkers who brainstorm out loud." },
+      { property: "og:description", content: "Turn voice memos into living mind maps. VoxNode auto-organizes spoken brainstorms into visual, draggable node graphs." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:title", content: "VoxNode — Speak your mind. See your thoughts." },
+      { name: "twitter:description", content: "Turn voice memos into living mind maps. VoxNode auto-organizes spoken brainstorms into visual, draggable node graphs." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/d8986c3a-7896-40a9-8e0f-bebd2aaa6346/id-preview-bb9e382e--09cf16dc-0781-4011-8b7c-a7ead9e0dbf0.lovable.app-1777534942801.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/d8986c3a-7896-40a9-8e0f-bebd2aaa6346/id-preview-bb9e382e--09cf16dc-0781-4011-8b7c-a7ead9e0dbf0.lovable.app-1777534942801.png" },
     ],
     links: [
       {
