@@ -1,4 +1,4 @@
 project_id = "ddcflzbixmeiwqgqsnyr"
 
 [functions.generate-mindmap]
-verify_jwt = false
+verify_jwt = true
