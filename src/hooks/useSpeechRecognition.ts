@@ -18,6 +18,14 @@ function getCtor(): (new () => SpeechRecognitionLike) | null {
   return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
 }
 
+export type RecordingResult = { transcript: string; audioBlob: Blob | null; mimeType: string | null };
+
+function pickMime(): string | undefined {
+  if (typeof MediaRecorder === "undefined") return undefined;
+  const candidates = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg"];
+  return candidates.find((m) => MediaRecorder.isTypeSupported(m));
+}
+
 export function useSpeechRecognition() {
   const [supported, setSupported] = useState(false);
   const [listening, setListening] = useState(false);
@@ -26,19 +34,42 @@ export function useSpeechRecognition() {
   const recRef = useRef<SpeechRecognitionLike | null>(null);
   const finalRef = useRef<string>("");
   const resolveRef = useRef<((transcript: string) => void) | null>(null);
+  const mediaRecRef = useRef<MediaRecorder | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const mimeRef = useRef<string | null>(null);
 
   useEffect(() => {
     setSupported(!!getCtor());
   }, []);
 
-  const start = useCallback(() => {
+  const start = useCallback(async () => {
     setError(null);
     setInterim("");
     finalRef.current = "";
+    chunksRef.current = [];
+    mimeRef.current = null;
     const Ctor = getCtor();
     if (!Ctor) {
       setError("Speech recognition is not supported in this browser. Try Chrome or Edge.");
       return false;
+    }
+    // Try to also capture raw audio with MediaRecorder. Speech recognition still works
+    // even if this fails (e.g. permission denied in iframe), so treat audio as optional.
+    try {
+      if (typeof navigator !== "undefined" && navigator.mediaDevices?.getUserMedia) {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaStreamRef.current = stream;
+        const mime = pickMime();
+        const mr = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
+        mimeRef.current = mr.mimeType || mime || "audio/webm";
+        mr.ondataavailable = (e) => { if (e.data && e.data.size > 0) chunksRef.current.push(e.data); };
+        mr.start(1000); // collect a chunk every second
+        mediaRecRef.current = mr;
+      }
+    } catch (e) {
+      // Non-fatal: keep going with transcription only.
+      console.warn("Audio capture unavailable:", e);
     }
     const rec = new Ctor();
     rec.continuous = true;
@@ -73,15 +104,43 @@ export function useSpeechRecognition() {
     }
   }, []);
 
-  const stop = useCallback((): Promise<string> => {
-    return new Promise((resolve) => {
-      if (!recRef.current) {
-        resolve(finalRef.current.trim());
-        return;
-      }
-      resolveRef.current = resolve;
-      try { recRef.current.stop(); } catch { resolve(finalRef.current.trim()); }
-    });
+  const stop = useCallback((): Promise<RecordingResult> => {
+    const stopAudio = () =>
+      new Promise<{ blob: Blob | null; mime: string | null }>((resolve) => {
+        const mr = mediaRecRef.current;
+        const stream = mediaStreamRef.current;
+        const cleanup = () => {
+          stream?.getTracks().forEach((t) => t.stop());
+          mediaStreamRef.current = null;
+          mediaRecRef.current = null;
+        };
+        if (!mr) { cleanup(); resolve({ blob: null, mime: null }); return; }
+        if (mr.state === "inactive") {
+          const blob = chunksRef.current.length ? new Blob(chunksRef.current, { type: mimeRef.current ?? "audio/webm" }) : null;
+          cleanup();
+          resolve({ blob, mime: mimeRef.current });
+          return;
+        }
+        mr.onstop = () => {
+          const blob = chunksRef.current.length ? new Blob(chunksRef.current, { type: mimeRef.current ?? "audio/webm" }) : null;
+          cleanup();
+          resolve({ blob, mime: mimeRef.current });
+        };
+        try { mr.stop(); } catch { cleanup(); resolve({ blob: null, mime: null }); }
+      });
+
+    const stopSpeech = () =>
+      new Promise<string>((resolve) => {
+        if (!recRef.current) { resolve(finalRef.current.trim()); return; }
+        resolveRef.current = resolve;
+        try { recRef.current.stop(); } catch { resolve(finalRef.current.trim()); }
+      });
+
+    return Promise.all([stopSpeech(), stopAudio()]).then(([transcript, audio]) => ({
+      transcript,
+      audioBlob: audio.blob,
+      mimeType: audio.mime,
+    }));
   }, []);
 
   return { supported, listening, interim, error, start, stop };
