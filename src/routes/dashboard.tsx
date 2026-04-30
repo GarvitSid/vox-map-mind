@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Mic, Square, Plus, Search, Download, FileText, ImageIcon, LogOut, Sparkles, Trash2, Menu } from "lucide-react";
 import { toPng } from "html-to-image";
 import { toast } from "sonner";
