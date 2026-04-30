@@ -54,6 +54,7 @@ function Dashboard() {
   const [query, setQuery] = useState("");
   const [loadingNotes, setLoadingNotes] = useState(true);
   const [mindMap, setMindMap] = useState<MindMap | null>(null);
+  const [mindMapId, setMindMapId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const canvasRef = useRef<HTMLDivElement | null>(null);
   const recordStartRef = useRef<number>(0);
@@ -82,17 +83,17 @@ function Dashboard() {
   }, [user]);
 
   // Load active mind map
-  useEffect(() => {
-    if (!activeId) { setMindMap(null); return; }
-    let cancelled = false;
-    getMindMapForNote(activeId)
-      .then((res) => {
-        if (cancelled) return;
-        setMindMap(res ? toMindMap(activeId, res.nodes, res.edges) : null);
-      })
-      .catch((e) => setError(e instanceof Error ? e.message : "Failed to load mind map"));
-    return () => { cancelled = true; };
+  const reloadMindMap = useCallback(async () => {
+    if (!activeId) { setMindMap(null); setMindMapId(null); return; }
+    try {
+      const res = await getMindMapForNote(activeId);
+      setMindMap(res ? toMindMap(activeId, res.nodes, res.edges) : null);
+      setMindMapId(res?.map.id ?? null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load mind map");
+    }
   }, [activeId]);
+  useEffect(() => { void reloadMindMap(); }, [reloadMindMap]);
 
   const filtered = useMemo(
     () => notes.filter((n) => n.title.toLowerCase().includes(query.toLowerCase())),
@@ -466,7 +467,12 @@ function Dashboard() {
               </div>
             </div>
           ) : mindMap ? (
-            <MindMapCanvas map={mindMap} />
+            <MindMapCanvas
+              map={mindMap}
+              userId={user.id}
+              mindMapId={mindMapId}
+              onChange={reloadMindMap}
+            />
           ) : (
             <div className="grid h-full place-items-center text-center">
               <div>
