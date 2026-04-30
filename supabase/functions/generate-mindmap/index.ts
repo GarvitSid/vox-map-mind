@@ -38,6 +38,15 @@ Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
+    // Defense in depth: require an Authorization bearer token even though
+    // verify_jwt = true is set at the platform level.
+    const authHeader = req.headers.get("Authorization") ?? req.headers.get("authorization");
+    if (!authHeader?.toLowerCase().startsWith("bearer ")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const { transcript } = await req.json();
     if (!transcript || typeof transcript !== "string" || transcript.trim().length < 2) {
       return new Response(JSON.stringify({ error: "Empty transcript" }), {
