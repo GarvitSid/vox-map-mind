@@ -24,7 +24,7 @@
 VoxNode is a modern web application that transforms unstructured voice memos into interactive, visual mind maps in real-time. 
 
 Built for neurodivergent thinkers, brainstormers, and visual learners, VoxNode removes the friction of formatting and typing. You just speak, and our AI pipeline transcribes, structures, and lays out your thoughts into a draggable node graph containing your core ideas and actionable tasks.
-
+<a id="features"></a>
 ## ✨ Features
 
 - **🎙️ Friction-Free Voice Capture:** Speak naturally. The app uses the native Web Speech API to capture your brainstorms.
@@ -33,7 +33,7 @@ Built for neurodivergent thinkers, brainstormers, and visual learners, VoxNode r
 - **📤 Universal Export:** Export your mind maps as high-resolution PNGs or structured Markdown files to drop straight into Notion, Obsidian, or Jira.
 - **🔐 Secure & Private:** Full authentication flow (Email + Google OAuth) and Row Level Security (RLS) ensures your thoughts belong only to you.
 - **⚡ Edge Rendered:** Server-Side Rendering (SSR) via TanStack Start, built to be deployed on Cloudflare Workers for global low-latency performance.
-
+<a id="tech-stack"></a>
 ## 🛠️ Tech Stack
 
 **Frontend:**
@@ -52,7 +52,7 @@ Built for neurodivergent thinkers, brainstormers, and visual learners, VoxNode r
 
 **Deployment:**
 - Cloudflare Workers (`wrangler`)
-
+<a id="architecture"></a>
 ## 🏗️ Architecture & Data Flow
 
 1. **Input:** User hits record. Audio is captured via `MediaRecorder` and transcribed live via the browser's Web Speech API.
@@ -62,7 +62,7 @@ Built for neurodivergent thinkers, brainstormers, and visual learners, VoxNode r
 5. **Persistence:** Nodes and Edges are saved to PostgreSQL. Subsequent drag-and-drop actions by the user are debounced and synced to the database.
 
 ---
-
+<a id="getting-started"></a>
 ## 🚀 Getting Started (Local Development)
 
 ### Prerequisites
